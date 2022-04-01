@@ -1,0 +1,7 @@
+*.yml
+__pycache__/
+.idea/
+build/
+dist/
+venv/
+Rando Setup Checker.zip
