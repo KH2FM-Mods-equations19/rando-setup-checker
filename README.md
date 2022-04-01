@@ -1,0 +1,1 @@
+# rando-setup-checker
