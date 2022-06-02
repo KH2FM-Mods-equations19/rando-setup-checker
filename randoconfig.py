@@ -1,8 +1,10 @@
 import json
 import os
+import textwrap
 from pathlib import Path
 from typing import Optional
 
+import toml
 import yaml
 
 
@@ -118,7 +120,60 @@ class PcRandoConfiguration:
             result.errors.append('Game Install location is missing the `DBGHELP.dll` file for LuaBackend Hook')
             return result
 
-        result.infos.append('Found LuaBackend Hook DLL')
+        lua_dll_path = game_path / 'lua54.dll'
+        if not lua_dll_path.is_file():
+            result.errors.append('Game Install location is missing the `lua54.dll` file needed for LuaBackend Hook')
+            return result
+
+        luabackend_config_path = game_path / 'LuaBackend.toml'
+        if not luabackend_config_path.is_file():
+            result.errors.append('Game Install location is missing the `LuaBackend.toml` configuration file')
+            return result
+
+        result.infos.append('Found all LuaBackend Hook files')
+
+        with open(luabackend_config_path) as file:
+            luabackend_config = toml.load(file)
+
+        if 'kh2' not in luabackend_config:
+            result.errors.append('`LuaBackend.toml` file is missing a section for kh2')
+            return result
+
+        kh2_config = luabackend_config['kh2']
+        if 'scripts' not in kh2_config:
+            result.errors.append('`LuaBackend.toml` file has a kh2 section but is missing a `scripts` list')
+            return result
+
+        scripts_config = kh2_config['scripts']
+
+        home_path = Path(os.path.expanduser('~'))
+        default_path = home_path / 'Documents' / 'KINGDOM HEARTS HD 1.5+2.5 ReMIX'
+
+        script_locations = []
+        for script_config in scripts_config:
+            relative = script_config['relative']
+            if relative:
+                scripts_path = default_path / script_config['path']
+            else:
+                scripts_path = Path(script_config['path'])
+            if scripts_path.is_dir():
+                script_locations.append(scripts_path)
+        self.script_locations = script_locations
+
+        expected_openkh_script_output = self.openkh_path / 'mod' / 'scripts'
+        found_openkh_script_output = False
+        for script_location in script_locations:
+            if expected_openkh_script_output == script_location:
+                found_openkh_script_output = True
+
+        if found_openkh_script_output:
+            result.infos.append('`LuaBackend.toml` is configured properly for OpenKH mods to include Lua scripts')
+        else:
+            error = textwrap.dedent('''\
+            `LuaBackend.toml` is not configured properly for OpenKH mods to include Lua scripts.
+               See the LuaBackend Hook setup guide on kh2rando.com for more, and/or ask for help in the Discord.''')
+            result.errors.append(error)
+
         return result
 
     def _validate_openkh(self) -> ConfigurationCheckResult:
@@ -219,28 +274,27 @@ class PcRandoConfiguration:
 
         result.infos.append('Found Patches location [{}]'.format(patches_path))
 
-        for file in os.listdir(patches_path):
+        for file in os.listdir(str(patches_path)):
             if file.endswith('.kh2pcpatch'):
                 result.infos.append('Found patch [{}]'.format(file))
 
         return result
 
-    @staticmethod
-    def _validate_lua_scripts() -> ConfigurationCheckResult:
+    def _validate_lua_scripts(self) -> ConfigurationCheckResult:
         result = ConfigurationCheckResult('Lua scripts')
 
-        home_path = Path(os.path.expanduser('~'))
-        default_path = home_path / 'Documents' / 'KINGDOM HEARTS HD 1.5+2.5 ReMIX' / 'scripts' / 'kh2'
-        if not default_path.is_dir():
-            result.errors.append('Expected script location [{}] does not exist'.format(default_path))
+        script_locations = self.script_locations
+        if not script_locations:
+            result.errors.append('None of the configured LuaBackend script locations exist')
             return result
 
-        result.infos.append('Found script location [{}]'.format(default_path))
-
         found_scripts = []
-        for file in os.listdir(default_path):
-            if file.endswith('.lua'):
-                found_scripts.append(file)
+        for script_location in script_locations:
+            result.infos.append('Found script location [{}]'.format(script_location))
+
+            for file in os.listdir(script_location):
+                if file.endswith('.lua'):
+                    found_scripts.append(script_location / file)
 
         if not found_scripts:
             result.errors.append('No Lua scripts were found')
@@ -358,7 +412,7 @@ class Pcsx2RandoConfiguration:
         result.infos.append('Found Cheats location')
 
         found_cheats = []
-        for file in os.listdir(cheats_path):
+        for file in os.listdir(str(cheats_path)):
             if file.startswith('F266B00B') and file.endswith('.pnach'):
                 found_cheats.append(file)
 
