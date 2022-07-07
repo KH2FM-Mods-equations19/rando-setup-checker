@@ -31,6 +31,7 @@ class PcRandoConfiguration:
         self.games_extract_path = games_extract_path
         self.mods_manager_bridge_path = mods_manager_bridge_path
         self.patches_path = patches_path
+        self.script_locations = []
 
     @staticmethod
     def read_from_mods_manager_bridge(mods_manager_bridge_path: Optional[Path]):
