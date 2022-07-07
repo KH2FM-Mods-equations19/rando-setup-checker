@@ -1,3 +1,5 @@
+import traceback
+
 from PySide6.QtWidgets import QDialog, QLineEdit, QGridLayout, QPushButton, QFileDialog, QLabel, QVBoxLayout, QTextEdit
 
 import validation
@@ -56,9 +58,13 @@ class Pcsx2ConfigurationDialog(QDialog):
             self.cheats_path_field.setText(output)
 
     def _validate_clicked(self):
-        rando_configuration = Pcsx2RandoConfiguration.read(
-            openkh_path=path_or_none(self.openkh_path_field.text()),
-            cheats_path=path_or_none(self.cheats_path_field.text())
-        )
-        all_results = rando_configuration.validate_all()
-        validation.show_validation_result(self.validation_result, all_results)
+        try:
+            rando_configuration = Pcsx2RandoConfiguration.read(
+                openkh_path=path_or_none(self.openkh_path_field.text()),
+                cheats_path=path_or_none(self.cheats_path_field.text())
+            )
+            all_results = rando_configuration.validate_all()
+            validation.show_validation_result(self.validation_result, all_results)
+        except BaseException:
+            self.validation_result.setText(traceback.format_exc())
+            raise
